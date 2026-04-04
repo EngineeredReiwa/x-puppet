@@ -259,43 +259,94 @@ async function navigate_(client, path) {
 }
 
 async function comment(client, permalink, text) {
-  const { Page } = client;
+  const { Page, Input, Target } = client;
   await Page.enable();
+
+  // Activate this tab to ensure Input API works
+  try {
+    const { targetInfo } = await Target.getTargetInfo();
+    await Target.activateTarget({ targetId: targetInfo.targetId });
+  } catch (e) { /* older CDP versions may not support this */ }
+  await sleep(500);
+
   const url = permalink.startsWith('http')
     ? permalink
     : 'https://www.reddit.com' + (permalink.startsWith('/') ? permalink : '/' + permalink);
   await Page.navigate({ url });
   await sleep(3000);
 
-  // Find and click the comment textbox (role="textbox" with placeholder)
-  const opened = await evaluate(client, `
-    (function() {
-      var editor = document.querySelector('[role="textbox"][class*="cursor-text"]');
-      if (editor) { editor.click(); editor.focus(); return 'found'; }
-      var fallback = document.querySelector('[role="textbox"]');
-      if (fallback) { fallback.click(); fallback.focus(); return 'found'; }
-      return 'not_found';
-    })()
-  `);
+  // Wait for FACEPLATE-TEXTAREA-INPUT to render
+  // Note: direct querySelector().getBoundingClientRect() returns 0 on Reddit
+  // but finding via parent querySelectorAll works
+  let pos = '';
+  for (let i = 0; i < 10; i++) {
+    pos = await evaluate(client, `
+      (function() {
+        var cch = document.querySelector('comment-composer-host');
+        if (!cch) return '';
+        var ft = cch.querySelector('faceplate-textarea-input');
+        if (!ft) return '';
+        var els = cch.querySelectorAll('*');
+        for (var j = 0; j < els.length; j++) {
+          if (els[j].tagName === 'FACEPLATE-TEXTAREA-INPUT') {
+            var rect = els[j].getBoundingClientRect();
+            if (rect.width > 100) {
+              return JSON.stringify({ x: rect.x + rect.width / 2, y: rect.y + rect.height / 2 });
+            }
+          }
+        }
+        return '';
+      })()
+    `);
+    if (pos) break;
+    await sleep(1000);
+  }
 
-  if (opened === 'not_found') {
+  if (!pos) {
     console.error('❌ comment box not found on', url);
     return;
   }
+  const { x, y } = JSON.parse(pos);
+
+  // Click faceplate to expand editor
+  await Input.dispatchMouseEvent({ type: 'mousePressed', x, y, button: 'left', clickCount: 1, pointerType: 'mouse' });
+  await Input.dispatchMouseEvent({ type: 'mouseReleased', x, y, button: 'left', clickCount: 1, pointerType: 'mouse' });
+  await sleep(2000);
+
+  // Wait for expanded editor — also use querySelectorAll via parent
+  let editorPos = '';
+  for (let i = 0; i < 5; i++) {
+    editorPos = await evaluate(client, `
+      (function() {
+        var cch = document.querySelector('comment-composer-host');
+        if (!cch) return '';
+        var els = cch.querySelectorAll('*');
+        for (var j = 0; j < els.length; j++) {
+          if (els[j].getAttribute('role') === 'textbox' && els[j].contentEditable === 'true') {
+            var rect = els[j].getBoundingClientRect();
+            if (rect.width > 100) {
+              return JSON.stringify({ x: rect.x + rect.width / 2, y: rect.y + rect.height / 2 });
+            }
+          }
+        }
+        return '';
+      })()
+    `);
+    if (editorPos) break;
+    await sleep(1000);
+  }
+
+  if (!editorPos) {
+    console.error('❌ editor did not expand on', url);
+    return;
+  }
+  const ep = JSON.parse(editorPos);
+  await Input.dispatchMouseEvent({ type: 'mousePressed', x: ep.x, y: ep.y, button: 'left', clickCount: 1 });
+  await Input.dispatchMouseEvent({ type: 'mouseReleased', x: ep.x, y: ep.y, button: 'left', clickCount: 1 });
   await sleep(500);
 
-  // Type the comment text
-  await evaluate(client, `
-    (function() {
-      var editor = document.querySelector('[role="textbox"][class*="cursor-text"]')
-        || document.querySelector('[role="textbox"]');
-      if (editor) {
-        editor.focus();
-        document.execCommand('insertText', false, ${JSON.stringify(text)});
-        editor.dispatchEvent(new Event('input', { bubbles: true }));
-      }
-    })()
-  `);
+  // Type using CDP Input.insertText
+  await Input.insertText({ text });
   await sleep(500);
 
   // Click the submit button (「コメント」or "Comment")
@@ -323,6 +374,111 @@ async function comment(client, permalink, text) {
   console.log('   text:', text.slice(0, 80) + (text.length > 80 ? '...' : ''));
 }
 
+async function draft(client) {
+  const result = await evaluate(client, `
+    (function() {
+      var cch = document.querySelector('comment-composer-host');
+      if (!cch) return '';
+      var els = cch.querySelectorAll('*');
+      for (var i = 0; i < els.length; i++) {
+        if (els[i].getAttribute('role') === 'textbox' && els[i].contentEditable === 'true') {
+          return els[i].textContent || '';
+        }
+      }
+      return '';
+    })()
+  `);
+  if (result) {
+    console.log('📝 draft:', result);
+  } else {
+    console.log('📝 draft: (empty or editor not open)');
+  }
+  return result;
+}
+
+async function verify(client) {
+  const result = await evaluate(client, `
+    (async function() {
+      var url = window.location.href;
+      var match = url.match(/\\/comments\\/([^/]+)/);
+      if (!match) return JSON.stringify({ error: 'not on a post page' });
+
+      // Get username
+      var username = '';
+      try {
+        var meResp = await fetch('https://www.reddit.com/api/me.json');
+        var meData = await meResp.json();
+        username = meData.data ? meData.data.name : '';
+      } catch(e) {}
+
+      // Get comments
+      var resp = await fetch(url + '.json');
+      var d = await resp.json();
+      if (!Array.isArray(d) || !d[1]) return JSON.stringify({ error: 'no comments data' });
+      var comments = d[1].data.children.filter(function(c) { return c.kind === 't1'; });
+      var mine = comments.filter(function(c) { return c.data.author === username; });
+      if (mine.length === 0) return JSON.stringify({ status: 'NOT_FOUND', username: username, totalComments: comments.length });
+      var latest = mine[mine.length - 1].data;
+      return JSON.stringify({
+        status: latest.body === '[removed]' || latest.body === '[deleted]' ? 'REMOVED' : 'ALIVE',
+        body: latest.body.substring(0, 200),
+        score: latest.score,
+        created: new Date(latest.created_utc * 1000).toISOString(),
+        username: username,
+      });
+    })()
+  `);
+  const res = JSON.parse(result);
+  if (res.status === 'ALIVE') {
+    console.log('✅ ALIVE | ⬆' + res.score + ' | ' + res.body.slice(0, 80));
+  } else if (res.status === 'REMOVED') {
+    console.log('❌ REMOVED | ' + res.body.slice(0, 80));
+  } else if (res.status === 'NOT_FOUND') {
+    console.log('⚠️  NOT_FOUND | user: ' + res.username + ' | total comments: ' + res.totalComments);
+  } else {
+    console.log('⚠️ ', JSON.stringify(res));
+  }
+  return res;
+}
+
+async function clear(client) {
+  const { Input } = client;
+  // Select all text and delete
+  const editorPos = await evaluate(client, `
+    (function() {
+      var cch = document.querySelector('comment-composer-host');
+      if (!cch) return '';
+      var els = cch.querySelectorAll('*');
+      for (var i = 0; i < els.length; i++) {
+        if (els[i].getAttribute('role') === 'textbox' && els[i].contentEditable === 'true') {
+          var rect = els[i].getBoundingClientRect();
+          if (rect.width > 100) {
+            els[i].focus();
+            return JSON.stringify({ x: rect.x + rect.width / 2, y: rect.y + rect.height / 2 });
+          }
+        }
+      }
+      return '';
+    })()
+  `);
+  if (!editorPos) {
+    console.log('📝 no editor open to clear');
+    return;
+  }
+  const ep = JSON.parse(editorPos);
+  await Input.dispatchMouseEvent({ type: 'mousePressed', x: ep.x, y: ep.y, button: 'left', clickCount: 1 });
+  await Input.dispatchMouseEvent({ type: 'mouseReleased', x: ep.x, y: ep.y, button: 'left', clickCount: 1 });
+  await sleep(200);
+  // Ctrl+A then Backspace
+  await Input.dispatchKeyEvent({ type: 'keyDown', key: 'a', code: 'KeyA', modifiers: 2 }); // 2 = Ctrl/Cmd
+  await Input.dispatchKeyEvent({ type: 'keyUp', key: 'a', code: 'KeyA', modifiers: 2 });
+  await sleep(100);
+  await Input.dispatchKeyEvent({ type: 'keyDown', key: 'Backspace', code: 'Backspace' });
+  await Input.dispatchKeyEvent({ type: 'keyUp', key: 'Backspace', code: 'Backspace' });
+  await sleep(200);
+  console.log('🗑️  draft cleared');
+}
+
 async function eval_(client, js) {
   const result = await evaluate(client, js);
   console.log(result);
@@ -336,6 +492,9 @@ const commands = {
   upvote:   { fn: (c, args) => upvote(c, parseInt(args[0]) || 0),                 usage: 'upvote [index]' },
   downvote: { fn: (c, args) => downvote(c, parseInt(args[0]) || 0),               usage: 'downvote [index]' },
   comment:  { fn: (c, args) => comment(c, args[0], args.slice(1).join(' ')),        usage: 'comment <permalink> <text>' },
+  draft:    { fn: (c, args) => draft(c),                                           usage: 'draft' },
+  verify:   { fn: (c, args) => verify(c),                                          usage: 'verify' },
+  clear:    { fn: (c, args) => clear(c),                                           usage: 'clear' },
   navigate: { fn: (c, args) => navigate_(c, args.join(' ')),                       usage: 'navigate <subreddit>' },
   eval:     { fn: (c, args) => eval_(c, args.join(' ')),                           usage: 'eval <js>' },
 };

@@ -35,6 +35,16 @@ No API keys. No Puppeteer. No new browser. Just your Chrome.
 
 ### 2. Install
 
+**One-command install (with Claude Code skill):**
+
+```bash
+npx github:EngineeredReiwa/x-puppet puppet-install
+```
+
+This clones the repo to `~/puppet`, installs dependencies, and links the Claude Code skill automatically.
+
+**Or manual install:**
+
 ```bash
 git clone https://github.com/EngineeredReiwa/x-puppet.git
 cd x-puppet

@@ -5,7 +5,8 @@
   "main": "index.js",
   "bin": {
     "puppet": "./puppet.js",
-    "x-puppet": "./index.js"
+    "x-puppet": "./index.js",
+    "puppet-install": "./install.js"
   },
   "scripts": {
     "start": "node index.js"

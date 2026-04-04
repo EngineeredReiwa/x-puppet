@@ -1,7 +1,25 @@
-# puppet
+<p align="center">
+  <h1 align="center">puppet</h1>
+  <p align="center">
+    Multi-platform social media automation via Chrome DevTools Protocol.<br>
+    No API keys. No Puppeteer. No new browser. Just your Chrome.
+  </p>
+  <p align="center">
+    <a href="https://github.com/EngineeredReiwa/x-puppet/stargazers"><img src="https://img.shields.io/github/stars/EngineeredReiwa/x-puppet?style=social" alt="Stars"></a>
+    <a href="https://github.com/EngineeredReiwa/x-puppet/network/members"><img src="https://img.shields.io/github/forks/EngineeredReiwa/x-puppet?style=social" alt="Forks"></a>
+    <a href="https://github.com/EngineeredReiwa/x-puppet/blob/main/LICENSE"><img src="https://img.shields.io/badge/license-MIT-blue.svg" alt="License"></a>
+    <a href="https://github.com/EngineeredReiwa/x-puppet/issues"><img src="https://img.shields.io/github/issues/EngineeredReiwa/x-puppet" alt="Issues"></a>
+    <a href="https://github.com/EngineeredReiwa/x-puppet/pulls"><img src="https://img.shields.io/github/issues-pr/EngineeredReiwa/x-puppet" alt="PRs"></a>
+  </p>
+</p>
 
-Multi-platform DOM automation via Chrome DevTools Protocol.
-No API keys. No Puppeteer. No new browser. Just your Chrome.
+---
+
+## What is puppet?
+
+**puppet** turns your everyday Chrome into a social media automation engine. It connects to your already-logged-in browser via CDP (Chrome DevTools Protocol) — no API keys, no tokens, no headless browser.
+
+One dependency. Zero config. Works everywhere Chrome runs.
 
 ## Supported Platforms
 
@@ -10,12 +28,15 @@ No API keys. No Puppeteer. No new browser. Just your Chrome.
 | **X / Twitter** | Timeline, profile, search, followers | Tweet, like, reply, follow | DOM |
 | **Reddit** | Feed, search, post detail, comments | Upvote, downvote, comment | DOM + JSON API |
 | **Discord** | Server discovery, channels, messages | Join server, send messages | DOM + CDP Input |
+| **note.com** | Feed, search | Suki (like) | DOM |
 
-## Why?
+> **Want to add a platform?** It takes ~100 lines. See [Contributing](#contributing).
 
-| | Official API | Puppeteer | puppet (CDP) |
+## Why puppet?
+
+| | Official API | Puppeteer | **puppet (CDP)** |
 |---|---|---|---|
-| Cost | $100/mo+ | Free | Free |
+| Cost | $100/mo+ | Free | **Free** |
 | Browser | N/A | New Chromium | **Your Chrome** |
 | Login | OAuth / tokens | Cookie management | **Already logged in** |
 | Detection risk | None | Stealth plugin needed | **None (you ARE the user)** |
@@ -32,7 +53,7 @@ No API keys. No Puppeteer. No new browser. Just your Chrome.
   --user-data-dir="$HOME/.puppet-chrome"
 ```
 
-> First time? Log into X / Reddit manually in this Chrome window. Sessions persist.
+> First time? Log into X / Reddit / Discord manually in this Chrome window. Sessions persist.
 
 ### 2. Install
 
@@ -55,40 +76,32 @@ npm install
 ### 3. Use
 
 ```bash
-# --- Reddit ---
-node puppet.js reddit feed 20 javascript    # r/javascript の投稿20件
-node puppet.js reddit search "book" 10      # "book" で検索
-node puppet.js reddit read 0                # 投稿詳細 + コメント
-node puppet.js reddit upvote 0              # upvote
-node puppet.js reddit navigate books        # r/books に移動
-
 # --- X / Twitter ---
-node puppet.js x timeline 5                 # タイムライン
-node puppet.js x tweet "Hello!"             # ツイート
-node puppet.js x like 0                     # いいね
+node puppet.js x timeline 5                 # Read timeline
+node puppet.js x tweet "Hello!"             # Post a tweet
+node puppet.js x like 0                     # Like a tweet
+node puppet.js x search "query" 10          # Search tweets
+
+# --- Reddit ---
+node puppet.js reddit feed 20 javascript    # r/javascript posts
+node puppet.js reddit search "book" 10      # Search Reddit
+node puppet.js reddit read 0                # Post detail + comments
+node puppet.js reddit upvote 0              # Upvote
 
 # --- Discord ---
-node puppet.js discord discover "light novel" 10  # サーバー検索
-node puppet.js discord join 0                     # サーバー参加
-node puppet.js discord channels                   # チャンネル一覧
-node puppet.js discord messages 20                # メッセージ読み取り
-node puppet.js discord send "Hello!"              # メッセージ送信
+node puppet.js discord discover "light novel" 10  # Search servers
+node puppet.js discord join 0                     # Join server
+node puppet.js discord channels                   # List channels
+node puppet.js discord messages 20                # Read messages
+node puppet.js discord send "Hello!"              # Send message
+
+# --- note.com ---
+node puppet.js note feed 10                 # Read feed
+node puppet.js note search "keyword" 10     # Search articles
+node puppet.js note suki 0                  # Like article
 ```
 
 ## Commands
-
-### puppet reddit
-
-| Command | Description |
-|---------|-------------|
-| `feed [limit] [subreddit]` | Feed posts. With subreddit: JSON API (pagination, 100+ OK). Without: DOM (current page) |
-| `search <query> [limit]` | Search posts across Reddit |
-| `read [index]` | Post detail + top 20 comments (from DOM index) |
-| `detail <permalink>` | Post detail by permalink |
-| `upvote [index]` | Upvote post (Shadow DOM click) |
-| `downvote [index]` | Downvote post (Shadow DOM click) |
-| `navigate <subreddit>` | Navigate to subreddit |
-| `eval <js>` | Execute JS on page |
 
 ### puppet x
 
@@ -100,7 +113,21 @@ node puppet.js discord send "Hello!"              # メッセージ送信
 | `reply <text> [index]` | Reply to tweet |
 | `notifications [limit]` | Read notifications |
 | `timeline [limit]` | Read timeline |
+| `search <query> [limit]` | Search tweets |
 | `navigate <path>` | Go to x.com/\<path\> |
+| `eval <js>` | Execute JS on page |
+
+### puppet reddit
+
+| Command | Description |
+|---------|-------------|
+| `feed [limit] [subreddit]` | Feed posts. With subreddit: JSON API. Without: DOM |
+| `search <query> [limit]` | Search posts across Reddit |
+| `read [index]` | Post detail + top 20 comments |
+| `detail <permalink>` | Post detail by permalink |
+| `upvote [index]` | Upvote post |
+| `downvote [index]` | Downvote post |
+| `navigate <subreddit>` | Navigate to subreddit |
 | `eval <js>` | Execute JS on page |
 
 ### puppet discord
@@ -115,68 +142,66 @@ node puppet.js discord send "Hello!"              # メッセージ送信
 | `navigate <path>` | Navigate to Discord path |
 | `eval <js>` | Execute JS on page |
 
-### Legacy CLI (X only, XActions-compatible)
+### puppet note
 
-The original `index.js` still works with the full XActions-compatible feature set:
-
-```bash
-node index.js tweet "hello"
-node index.js search "query" 10
-node index.js auto-like "query" 5
-node index.js profile username
-```
-
-See `node index.js help` for all commands.
+| Command | Description |
+|---------|-------------|
+| `feed [limit]` | Read note.com feed |
+| `search <query> [limit]` | Search articles |
+| `suki [index]` | Like (suki) an article |
+| `navigate <path>` | Navigate to note.com path |
 
 ## Architecture
 
 ```
 Your Chrome (with --remote-debugging-port=9222)
-  ↑ CDP (Chrome DevTools Protocol)
+  ^ CDP (Chrome DevTools Protocol)
   |
 puppet (Node.js)
-  ├── puppet.js          — Multi-platform CLI router
-  ├── core/
-  │   └── cdp.js         — Shared: connectToTab, evaluate, sleep
-  ├── platforms/
-  │   ├── x.js           — X/Twitter module
-  │   └── reddit.js      — Reddit module (DOM + JSON API hybrid)
-  ├── index.js           — Legacy X-only CLI (XActions-compatible)
-  └── shim.js            — Puppeteer API compatibility layer
+  +-- puppet.js          -- Multi-platform CLI router
+  +-- core/
+  |   +-- cdp.js         -- Shared: connectToTab, evaluate, sleep
+  +-- platforms/
+  |   +-- x.js           -- X/Twitter module
+  |   +-- reddit.js      -- Reddit module (DOM + JSON API hybrid)
+  |   +-- discord.js     -- Discord module
+  |   +-- note.js        -- note.com module
+  +-- index.js           -- Legacy X-only CLI
+  +-- shim.js            -- Puppeteer API compatibility layer
 ```
-
-### Reddit: Hybrid Approach
-
-Reddit uses a dual strategy:
-
-- **Reading** (feed, search, detail): Reddit JSON API via browser `fetch()` — supports pagination, 100+ posts per request
-- **Actions** (upvote, downvote): Direct DOM manipulation through Shadow DOM (`shreddit-post.shadowRoot`)
-- **Home feed**: DOM scraping (personalized feed isn't available via JSON API)
 
 ### Adding a New Platform
 
 1. Create `platforms/yoursite.js` with `connect()` and `commands` export
 2. Add it to the `platforms` object in `puppet.js`
-3. Done
+3. Submit a PR
 
-## Using as a Library
+That's it. ~100 lines to add a whole platform.
 
-```js
-// Multi-platform (new)
-const reddit = require('./platforms/reddit');
-const client = await reddit.connect();
-// ... use reddit commands
+## Contributing
 
-// XActions-compatible (legacy)
-const { BrowserAutomationShim } = require('./shim');
-const ba = new BrowserAutomationShim();
-const page = await ba.connect();
-const profile = await ba.scrapeProfile(page, 'username');
-```
+**PRs are welcome and encouraged.** This project grows through community contributions.
+
+See [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines.
+
+### Ideas for contributions
+
+- **New platforms** — YouTube, Instagram, LinkedIn, Bluesky, Mastodon, TikTok...
+- **New commands** — DMs, bookmarks, repost, thread posting...
+- **Cross-platform workflows** — Post to multiple platforms at once
+- **Better error handling** — Retry logic, DOM change detection
+- **Documentation** — Tutorials, examples, translations
+
+Check out the [good first issues](https://github.com/EngineeredReiwa/x-puppet/issues?q=is%3Aissue+is%3Aopen+label%3A%22good+first+issue%22) to get started.
+
+## Maintainers Wanted
+
+puppet is community-driven. If you're actively contributing and want to help maintain this project, open an issue or reach out. We're looking for platform maintainers who can own specific modules (e.g., the Reddit module, the Discord module).
 
 ## Credits
 
-DOM selectors, rate limit patterns, and automation flows for X/Twitter are inspired by [XActions](https://github.com/nirholas/XActions) by [@nichxbt](https://x.com/nichxbt).
+- Created by [@EngineeredReiwa](https://x.com/EngineeredReiwa)
+- DOM selectors and automation patterns for X/Twitter inspired by [XActions](https://github.com/nirholas/XActions) by [@nichxbt](https://x.com/nichxbt)
 
 ## License
 

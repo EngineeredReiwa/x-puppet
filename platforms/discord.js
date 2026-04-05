@@ -7,10 +7,16 @@ async function connect() {
 // --- Helpers ---
 
 async function typeText(client, text) {
+  // React制御コンポーネント対応: keyDown + char + keyUp の3段階を発火
+  // char イベントが beforeinput/input を発生させ React の state を更新する
   for (const ch of text) {
-    await client.Input.dispatchKeyEvent({ type: 'keyDown', key: ch, text: ch });
-    await client.Input.dispatchKeyEvent({ type: 'keyUp', key: ch });
-    await sleep(50);
+    const upper = ch.toUpperCase();
+    const code = /^[a-zA-Z]$/.test(ch) ? 'Key' + upper : (ch === ' ' ? 'Space' : '');
+    const kc = ch === ' ' ? 32 : upper.charCodeAt(0);
+    await client.Input.dispatchKeyEvent({ type: 'keyDown', key: ch, code, windowsVirtualKeyCode: kc });
+    await client.Input.dispatchKeyEvent({ type: 'char', text: ch, unmodifiedText: ch });
+    await client.Input.dispatchKeyEvent({ type: 'keyUp', key: ch, code, windowsVirtualKeyCode: kc });
+    await sleep(60);
   }
 }
 
@@ -49,17 +55,27 @@ async function discover(client, query, limit = 10) {
   }
 
   if (query) {
-    // 検索欄をクリア＆入力
+    // 検索欄をフォーカス
     await evaluate(client, `
-      (function() {
-        var input = document.querySelector('input[aria-label="検索"], input[placeholder="検索"], input[type="text"]');
-        if (input) { input.focus(); input.value = ''; }
-      })()
+      document.querySelector('input[aria-label="検索"], input[placeholder="検索"], input[type="text"]').focus();
     `);
     await sleep(300);
+
+    // 既存の値を1文字ずつ Backspace で削除 (Cmd+Aが効かないため)
+    const existingValue = await evaluate(client, `
+      document.querySelector('input[aria-label="検索"], input[placeholder="検索"], input[type="text"]').value || ''
+    `);
+    for (let i = 0; i < existingValue.length; i++) {
+      await client.Input.dispatchKeyEvent({ type: 'keyDown', key: 'Backspace', code: 'Backspace', windowsVirtualKeyCode: 8 });
+      await client.Input.dispatchKeyEvent({ type: 'keyUp', key: 'Backspace', code: 'Backspace', windowsVirtualKeyCode: 8 });
+      await sleep(20);
+    }
+    await sleep(200);
+
     await typeText(client, query);
+    await sleep(300);
     await pressEnter(client);
-    await sleep(3000);
+    await sleep(2500);
   }
 
   // サーバーカード取得

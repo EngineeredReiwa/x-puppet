@@ -214,6 +214,124 @@ async function joinServer(client, index = 0) {
   return res;
 }
 
+// スクロールコンテナをmouseWheelで最下部までスクロール
+// (Discord のオンボーディングはscrollTopの直接セットでは「読了」判定が発火しないため物理スクロールが必要)
+async function scrollToBottom(client, selector = '[class*="scrollerContent"]') {
+  const pos = await evaluate(client, `
+    (function() {
+      var el = document.querySelector('${selector}');
+      if (!el) return JSON.stringify({ error: 'not_found' });
+      var r = el.getBoundingClientRect();
+      return JSON.stringify({ x: r.x + r.width/2, y: r.y + r.height/2, scrollHeight: el.scrollHeight, clientHeight: el.clientHeight });
+    })()
+  `);
+  const data = JSON.parse(pos);
+  if (data.error) return false;
+
+  const steps = Math.max(5, Math.ceil((data.scrollHeight - data.clientHeight) / 200) + 2);
+  for (let i = 0; i < steps; i++) {
+    await client.Input.dispatchMouseEvent({ type: 'mouseWheel', x: data.x, y: data.y, deltaX: 0, deltaY: 200 });
+    await sleep(150);
+  }
+  return true;
+}
+
+// Discord のサーバーオンボーディングを自動完了する
+// 1) 目的選択画面: 'Engage with us' を選ぶ (全チャンネルアンロック)
+// 2) 次へ押下
+// 3) ルール画面をスクロールして読了判定を発火
+// 4) 完了 🎉 押下
+async function onboard(client) {
+  const currentUrl = await evaluate(client, 'location.href');
+  if (!currentUrl.includes('/onboarding')) {
+    console.log('ℹ️  現在はオンボーディング画面ではありません');
+    return { skipped: true };
+  }
+
+  console.log('🚀 オンボーディング開始');
+
+  // Step 1: "Engage with us" をクリック
+  const step1 = await evaluate(client, `
+    (function() {
+      var targets = ['Engage with us', '交流する', 'すべてのチャンネルを利用'];
+      var all = document.querySelectorAll('label, button, div, [role="button"], [role="option"]');
+      for (var i = 0; i < all.length; i++) {
+        var tx = all[i].textContent.trim();
+        for (var j = 0; j < targets.length; j++) {
+          if (tx === targets[j]) { all[i].click(); return JSON.stringify({ ok: true, picked: tx }); }
+        }
+      }
+      return JSON.stringify({ ok: false });
+    })()
+  `);
+  const pick = JSON.parse(step1);
+  if (pick.ok) {
+    console.log(`  ✓ 目的: "${pick.picked}"`);
+  } else {
+    console.log('  ⚠️  目的選択肢が見つかりませんでした (既に選択済みかも)');
+  }
+  await sleep(1000);
+
+  // Step 2: 「次へ」押下
+  const step2 = await evaluate(client, `
+    (function() {
+      var btns = document.querySelectorAll('button');
+      for (var i = 0; i < btns.length; i++) {
+        var tx = btns[i].textContent.trim();
+        if ((tx === '次へ' || tx === 'Next' || tx === 'Continue') && !btns[i].disabled) {
+          btns[i].click();
+          return 'ok';
+        }
+      }
+      return 'not_found';
+    })()
+  `);
+  if (step2 === 'ok') console.log('  ✓ 次へ');
+  await sleep(2000);
+
+  // Step 3: ルールをスクロール
+  const scrolled = await scrollToBottom(client);
+  if (scrolled) console.log('  ✓ ルールをスクロール');
+  await sleep(800);
+
+  // Step 4: 完了 🎉 押下
+  const step4 = await evaluate(client, `
+    (function() {
+      var btns = document.querySelectorAll('button');
+      for (var i = 0; i < btns.length; i++) {
+        var tx = btns[i].textContent.trim();
+        if ((tx.indexOf('完了') !== -1 || tx === 'Finish' || tx === 'Complete') && !btns[i].disabled) {
+          btns[i].click();
+          return 'ok';
+        }
+      }
+      return 'disabled_or_not_found';
+    })()
+  `);
+  if (step4 === 'ok') {
+    console.log('  ✓ 完了');
+  } else {
+    console.log('  ⚠️  完了ボタンがdisabled or 見つかりません (手動で確認してください)');
+  }
+  await sleep(2500);
+
+  // 結果確認
+  const final = await evaluate(client, `
+    JSON.stringify({
+      url: location.href,
+      hasChatList: !!document.querySelector('[data-list-id="chat-messages"]'),
+      channels: document.querySelectorAll('[data-dnd-name]').length,
+    })
+  `);
+  const done = JSON.parse(final);
+  if (!done.url.includes('/onboarding')) {
+    console.log(`✅ オンボーディング完了 (${done.channels} channels accessible)`);
+  } else {
+    console.log('⚠️  まだオンボーディング画面です:', done.url);
+  }
+  return done;
+}
+
 async function channels(client) {
   const result = await evaluate(client, `
     (function() {
@@ -471,6 +589,7 @@ async function eval_(client, js) {
 const commands = {
   discover: { fn: (c, args) => discover(c, args[0] || null, parseInt(args[1]) || 10),  usage: 'discover [query] [limit]' },
   join:     { fn: (c, args) => joinServer(c, parseInt(args[0]) || 0),                   usage: 'join [index]' },
+  onboard:  { fn: (c, args) => onboard(c),                                              usage: 'onboard (complete server onboarding: pick purpose, scroll rules, finish)' },
   channels: { fn: (c, args) => channels(c),                                             usage: 'channels' },
   goto:     { fn: (c, args) => goto_(c, args.join(' ')),                                 usage: 'goto <channel-name|index>' },
   topic:    { fn: (c, args) => topic(c),                                                 usage: 'topic (read current channel rules/description)' },

@@ -2,13 +2,24 @@ const CDP = require('chrome-remote-interface');
 
 const CDP_PORT = parseInt(process.env.CDP_PORT || '9222');
 
+async function enableClient(client) {
+  await client.Runtime.enable();
+  // ウィンドウが背面でもキーイベント等を処理できるようにする
+  // (CDPから送るdispatchKeyEventがReact制御inputに届かない問題の対策)
+  try {
+    await client.Emulation.setFocusEmulationEnabled({ enabled: true });
+  } catch (e) {
+    // Emulationドメインが使えない環境は無視
+  }
+}
+
 async function connectToTab(urlPattern) {
   const targets = await CDP.List({ port: CDP_PORT });
   const target = targets.find(t => t.url.includes(urlPattern) && t.type === 'page');
 
   if (target) {
     const client = await CDP({ port: CDP_PORT, target });
-    await client.Runtime.enable();
+    await enableClient(client);
     return client;
   }
 
@@ -23,11 +34,11 @@ async function connectToTab(urlPattern) {
   if (target2) {
     await tmp.close();
     const client = await CDP({ port: CDP_PORT, target: target2 });
-    await client.Runtime.enable();
+    await enableClient(client);
     return client;
   }
 
-  await tmp.Runtime.enable();
+  await enableClient(tmp);
   return tmp;
 }
 

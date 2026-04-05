@@ -565,6 +565,49 @@ async function physicalClick(client, selectorExpression) {
   return { ok: true, x: pos.x, y: pos.y };
 }
 
+// React/Discord向けのクリック: 合成 PointerEvent と MouseEvent を直接要素に dispatch する
+// physicalClick では発火しないReactハンドラ (pointer events 依存) 向け
+async function reactClick(client, selectorExpression) {
+  const result = await evaluate(client, `
+    (function() {
+      var el = ${selectorExpression};
+      if (!el) return JSON.stringify({ error: 'not_found' });
+      var r = el.getBoundingClientRect();
+      if (r.width === 0 || r.height === 0) return JSON.stringify({ error: 'zero_size' });
+      var x = r.x + r.width / 2;
+      var y = r.y + r.height / 2;
+
+      // pointerover → pointermove → pointerdown → mousedown → pointerup → mouseup → click
+      var evtInit = {
+        bubbles: true,
+        cancelable: true,
+        composed: true,
+        clientX: x,
+        clientY: y,
+        screenX: x,
+        screenY: y,
+        button: 0,
+        buttons: 1,
+        pointerType: 'mouse',
+        pointerId: 1,
+        isPrimary: true,
+      };
+      try { el.dispatchEvent(new PointerEvent('pointerover', evtInit)); } catch(e) {}
+      try { el.dispatchEvent(new MouseEvent('mouseover', evtInit)); } catch(e) {}
+      try { el.dispatchEvent(new PointerEvent('pointermove', evtInit)); } catch(e) {}
+      try { el.dispatchEvent(new MouseEvent('mousemove', evtInit)); } catch(e) {}
+      try { el.dispatchEvent(new PointerEvent('pointerdown', evtInit)); } catch(e) {}
+      try { el.dispatchEvent(new MouseEvent('mousedown', evtInit)); } catch(e) {}
+      try { el.dispatchEvent(new PointerEvent('pointerup', Object.assign({}, evtInit, { buttons: 0 }))); } catch(e) {}
+      try { el.dispatchEvent(new MouseEvent('mouseup', Object.assign({}, evtInit, { buttons: 0 }))); } catch(e) {}
+      try { el.dispatchEvent(new MouseEvent('click', Object.assign({}, evtInit, { buttons: 0 }))); } catch(e) {}
+
+      return JSON.stringify({ ok: true, x: x, y: y });
+    })()
+  `);
+  return JSON.parse(result);
+}
+
 // 指定ユーザーのプロフィールからDMを開き、メッセージをドラフト入力する
 // (送信はしない - 安全のため必ず人間が目視確認してからEnter)
 //
@@ -621,8 +664,8 @@ async function dm(client, targetName, message) {
   console.log(`  ✓ 発見: ${foundData.matchedName}`);
   await sleep(500); // スクロール反映待ち
 
-  // Step 1: アバターを物理クリック (スクロール後の新座標で)
-  const step1 = await physicalClick(client, `
+  // Step 1: アバターを React向けクリック
+  const avatarSelector = `
     (function() {
       var msgs = document.querySelectorAll('[id^="chat-messages-"]');
       var target = ${JSON.stringify(targetName.toLowerCase())};
@@ -635,29 +678,27 @@ async function dm(client, targetName, message) {
       }
       return null;
     })()
-  `);
+  `;
+  const step1 = await reactClick(client, avatarSelector);
   if (!step1.ok) {
-    console.error('❌ アバターの物理クリックに失敗:', step1.error);
+    console.error('❌ アバタークリックに失敗:', step1.error);
     return;
   }
-  // クリック位置にヘッダー等が被ってないか確認
-  const topEl = await evaluate(client, `
-    (function() {
-      var el = document.elementFromPoint(${step1.x}, ${step1.y});
-      return el ? (el.tagName + '|' + (el.className || '').substring(0, 40)) : 'none';
-    })()
-  `);
-  console.log(`  ✓ アバタークリック (${Math.round(step1.x)}, ${Math.round(step1.y)}) topEl=${topEl}`);
-  await sleep(2500);
+  console.log(`  ✓ アバタークリック (${Math.round(step1.x)}, ${Math.round(step1.y)})`);
+  await sleep(2000);
 
-  // Step 2: popout の「その他」ボタン (aria-label="その他" or "More")
+  // Step 2: popout の「その他」ボタン (dialog配下限定でメッセージアクションバーと区別)
   // popout の生成を最大5秒待つ
   let step2 = null;
   for (let i = 0; i < 10; i++) {
-    step2 = await physicalClick(client, `
-      document.querySelector('[role="button"][aria-label="その他"]') ||
-      document.querySelector('[role="button"][aria-label="More"]') ||
-      document.querySelector('[class*="bannerButton"][role="button"]')
+    step2 = await reactClick(client, `
+      (function() {
+        var dialog = document.querySelector('[role="dialog"]');
+        if (!dialog) return null;
+        return dialog.querySelector('[role="button"][aria-label="その他"]')
+          || dialog.querySelector('[role="button"][aria-label="More"]')
+          || dialog.querySelector('[class*="bannerButton"][role="button"]');
+      })()
     `);
     if (step2.ok) break;
     await sleep(500);
@@ -686,7 +727,7 @@ async function dm(client, targetName, message) {
   // id + text の両方をリトライ
   let step3 = null;
   for (let i = 0; i < 8; i++) {
-    step3 = await physicalClick(client, `
+    step3 = await reactClick(client, `
       (function() {
         // id match
         var byId = document.querySelector('#user-profile-overflow-menu-view-profile');
@@ -722,9 +763,14 @@ async function dm(client, targetName, message) {
   await sleep(2000);
 
   // Step 4: フルプロフィール内の「メッセージ」ボタン
-  const step4 = await physicalClick(client, `
-    document.querySelector('button[role="button"][aria-label="メッセージ"], button[role="button"][aria-label="Message"]')
-  `);
+  let step4 = null;
+  for (let i = 0; i < 8; i++) {
+    step4 = await reactClick(client, `
+      document.querySelector('button[role="button"][aria-label="メッセージ"], button[role="button"][aria-label="Message"]')
+    `);
+    if (step4.ok) break;
+    await sleep(500);
+  }
   if (!step4.ok) {
     console.error('❌ 「メッセージ」ボタンが見つかりません (DM が無効化されている可能性があります)');
     return;

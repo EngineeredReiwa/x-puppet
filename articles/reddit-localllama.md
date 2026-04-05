@@ -1,6 +1,6 @@
 # I keep making LLM agents rediscover the same DOM selectors. Trying to package that as reusable recipes — does this make sense?
 
-Cross-posting a thought I've been chewing on (HN thread: https://news.ycombinator.com/ — will edit with link once it settles).
+Cross-posting a thought I've been chewing on (also discussed on HN today).
 
 When you hand a browser task to an LLM agent — MCP browser tools, Puppeteer + vision, Chrome DevTools MCP, whatever — the agent re-derives the same workflow every single run. Same selectors, same waits, same UI flow, same failure modes. Even when the site hasn't changed in weeks.
 
@@ -18,12 +18,9 @@ A recipe-less LLM agent running these naive approaches reports "done" and moves 
 
 What I'm trying instead: package site-specific workflow knowledge (which selectors actually work, which waits are required, which naive ops silently fail, how to verify for real) into reusable recipes that the agent calls as a single tool. One function call, one verified result, no DOM rediscovery.
 
-I built a tiny OSS prototype called **pupplet** with recipes for X/Twitter, Reddit, Discord, and note.com. CDP-first for now, but I don't think CDP is the important part — the point is the *recipe format*, not the backend.
+I built a tiny OSS prototype with recipes for X/Twitter, Reddit, Discord, and note.com. CDP-first for now, but I don't think CDP is the important part — the point is the *recipe format*, not the backend. (GitHub link in the comments, per sub rules.)
 
 I did run some measurements (2 tasks × 2 conditions × 3 trials each) and the recipe version used about 17–18× fewer tool calls and 7–8× less context than a step-by-step discovery loop. But honestly, the tool-call count isn't the part I care about most. In the 1M-context era, raw token savings is a weak argument. The *correctness* argument — not silently failing — feels more load-bearing.
-
-GitHub: https://github.com/EngineeredReiwa/pupplet
-Measurement report: https://github.com/EngineeredReiwa/pupplet/blob/main/experiments/REPORT.md
 
 What I'd love feedback on, especially from this sub:
 

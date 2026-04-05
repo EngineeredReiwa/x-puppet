@@ -661,6 +661,153 @@ async function submit(client, subreddit, filePath) {
   setTimeout(() => process.exit(0), 500);
 }
 
+// --- Edit existing post ---
+//
+// Edits the body of an existing self-post. Takes the same markdown format as submit
+// (the first `# ` line is a title for the submit workflow; edit ignores it and only
+// updates the body). Auto-saves on success because edit is reversible and low-risk.
+
+async function editPost(client, postUrl, filePath) {
+  if (!postUrl || !filePath) {
+    console.error('❌ Usage: pupplet reddit edit <post-url> <markdown-file>');
+    return;
+  }
+  if (!fs.existsSync(path.resolve(filePath))) {
+    console.error(`❌ File not found: ${filePath}`);
+    return;
+  }
+
+  const { body } = parseMarkdownPost(filePath);
+  if (!body) {
+    console.error('❌ Empty body');
+    return;
+  }
+
+  // Normalise to old.reddit.com — the new UI's edit flow is React-heavy
+  const oldUrl = postUrl.replace(/https?:\/\/(?:www\.|old\.)?reddit\.com/, 'https://old.reddit.com');
+  console.log(`📝 Editing: ${oldUrl}`);
+  console.log(`📝 New body: ${body.length} chars`);
+
+  const CDP = require('chrome-remote-interface');
+  const port = parseInt(process.env.CDP_PORT || '9222');
+
+  const tmpClient = await CDP({ port });
+  await tmpClient.Target.createTarget({ url: oldUrl });
+  await tmpClient.close();
+  await sleep(4000);
+
+  const targets = await CDP.List({ port });
+  const tab = targets.find(
+    (t) => t.type === 'page' && t.url.includes('old.reddit.com') && t.url.includes('/comments/'),
+  );
+  if (!tab) {
+    console.error('❌ Post tab not found');
+    return;
+  }
+
+  const c = await CDP({ port, target: tab });
+  await c.Runtime.enable();
+  await sleep(1500);
+
+  // Click the "edit" button on the main post
+  const clickResult = await evaluate(
+    c,
+    `(() => {
+      const post = document.querySelector('#siteTable .link.self') || document.querySelector('#siteTable .link');
+      if (!post) return 'NO_POST';
+      const editBtn = post.querySelector('.flat-list.buttons .edit-btn a') || post.querySelector('a.edit-btn') || post.querySelector('li.edit-btn > a');
+      if (!editBtn) return 'NO_EDIT_BTN';
+      editBtn.click();
+      return 'CLICKED';
+    })()`,
+  );
+  if (clickResult !== 'CLICKED') {
+    console.error(`❌ Could not click edit button: ${clickResult}`);
+    await c.close();
+    return;
+  }
+  console.log('✏️  Edit mode opened');
+  await sleep(500);
+
+  // Fill the textarea with the new body
+  const fillResult = await evaluate(
+    c,
+    `(() => {
+      const post = document.querySelector('#siteTable .link.self') || document.querySelector('#siteTable .link');
+      const form = post.querySelector('form.usertext.cloneable') || post.querySelector('form.usertext');
+      if (!form) return 'NO_FORM';
+      const textarea = form.querySelector('textarea');
+      if (!textarea) return 'NO_TEXTAREA';
+      textarea.focus();
+      textarea.value = ${JSON.stringify(body)};
+      textarea.dispatchEvent(new Event('input', { bubbles: true }));
+      textarea.dispatchEvent(new Event('change', { bubbles: true }));
+      return 'FILLED:' + textarea.value.length;
+    })()`,
+  );
+  if (typeof fillResult !== 'string' || !fillResult.startsWith('FILLED')) {
+    console.error(`❌ Could not fill textarea: ${fillResult}`);
+    await c.close();
+    return;
+  }
+  console.log(`✏️  Textarea filled: ${fillResult}`);
+  await sleep(300);
+
+  // Click the "save" button inside that same edit form
+  const saveResult = await evaluate(
+    c,
+    `(() => {
+      const post = document.querySelector('#siteTable .link.self') || document.querySelector('#siteTable .link');
+      const form = post.querySelector('form.usertext.cloneable') || post.querySelector('form.usertext');
+      if (!form) return 'NO_FORM';
+      // The save button is a <button type="submit"> inside the form buttons area
+      const saveBtn =
+        form.querySelector('button[type="submit"]') ||
+        form.querySelector('.save-button button') ||
+        form.querySelector('input[type="submit"]');
+      if (!saveBtn) return 'NO_SAVE_BTN';
+      saveBtn.click();
+      return 'CLICKED_SAVE';
+    })()`,
+  );
+  if (saveResult !== 'CLICKED_SAVE') {
+    console.error(`❌ Could not click save: ${saveResult}`);
+    console.log('   → Try clicking save manually in the browser');
+    await c.close();
+    return;
+  }
+  console.log('💾 Save clicked');
+
+  // Wait for save to complete and verify
+  await sleep(2500);
+
+  // Verify by reading the post body via JSON API (most reliable)
+  const postId = postUrl.match(/\/comments\/([a-z0-9]+)/)?.[1];
+  if (postId) {
+    const verifyResult = await evaluate(
+      c,
+      `fetch('https://www.reddit.com/comments/${postId}.json')
+        .then(r => r.json())
+        .then(d => {
+          const p = d[0].data.children[0].data;
+          return JSON.stringify({
+            selftext: (p.selftext || '').slice(0, 120),
+            removed_by_category: p.removed_by_category,
+            edited: p.edited,
+          });
+        }).catch(e => 'ERR:' + e.message)`,
+    );
+    console.log(`🔍 Post state: ${verifyResult}`);
+  }
+
+  console.log('\n✅ Edit flow complete.');
+  console.log('   Note: if the post was auto-removed before, editing alone may not be enough');
+  console.log('   to re-trigger automod approval. You may need to message the mods or');
+  console.log('   resubmit to a different sub.');
+
+  setTimeout(() => process.exit(0), 500);
+}
+
 const commands = {
   feed:     { fn: (c, args) => feed(c, parseInt(args[0]) || 5, args[1] || null),  usage: 'feed [limit] [subreddit]' },
   search:   { fn: (c, args) => search(c, args[0], parseInt(args[1]) || 10),       usage: 'search <query> [limit]' },
@@ -673,6 +820,7 @@ const commands = {
   verify:   { fn: (c, args) => verify(c),                                          usage: 'verify' },
   clear:    { fn: (c, args) => clear(c),                                           usage: 'clear' },
   submit:   { fn: (c, args) => submit(c, args[0], args[1]),                         usage: 'submit <subreddit> <markdown-file>' },
+  edit:     { fn: (c, args) => editPost(c, args[0], args[1]),                       usage: 'edit <post-url> <markdown-file>' },
   navigate: { fn: (c, args) => navigate_(c, args.join(' ')),                       usage: 'navigate <subreddit>' },
   eval:     { fn: (c, args) => eval_(c, args.join(' ')),                           usage: 'eval <js>' },
 };

@@ -188,25 +188,38 @@ class BrowserAutomationShim {
     await page.goto(`https://x.com/search?q=${encodeURIComponent(query)}&src=typed_query&f=live`, { waitUntil: 'networkidle2' });
     await sleep(2000);
 
-    return page.evaluate((lim) => {
-      const articles = document.querySelectorAll('article[data-testid="tweet"]');
-      return Array.from(articles).slice(0, lim).map(article => {
-        const textEl = article.querySelector('[data-testid="tweetText"]');
-        const linkEl = article.querySelector('a[href*="/status/"]');
-        const authorLink = article.querySelector('[data-testid="User-Name"] a[href^="/"]');
-        const timeEl = article.querySelector('time');
-        const tweetUrl = linkEl?.href;
-        const tweetId = tweetUrl?.split('/status/')[1]?.split('?')[0];
+    // スクロールして追加読み込み (X は lazy load)
+    const collected = new Map();
+    const maxScrolls = Math.ceil(limit / 5) + 2;
+    for (let i = 0; i < maxScrolls; i++) {
+      const batch = await page.evaluate(() => {
+        const articles = document.querySelectorAll('article[data-testid="tweet"]');
+        return Array.from(articles).map(article => {
+          const textEl = article.querySelector('[data-testid="tweetText"]');
+          const linkEl = article.querySelector('a[href*="/status/"]');
+          const authorLink = article.querySelector('[data-testid="User-Name"] a[href^="/"]');
+          const timeEl = article.querySelector('time');
+          const tweetUrl = linkEl?.href;
+          const tweetId = tweetUrl?.split('/status/')[1]?.split('?')[0];
+          return {
+            id: tweetId,
+            text: textEl?.textContent || '',
+            url: tweetUrl,
+            username: authorLink?.href?.split('/').pop() || '',
+            timestamp: timeEl?.getAttribute('datetime') || '',
+          };
+        }).filter(t => t.url);
+      });
+      for (const t of batch) {
+        if (!collected.has(t.id)) collected.set(t.id, t);
+      }
+      if (collected.size >= limit) break;
+      // スクロールして追加ロード
+      await page.evaluate(() => window.scrollBy(0, window.innerHeight * 2));
+      await sleep(1500);
+    }
 
-        return {
-          id: tweetId,
-          text: textEl?.textContent || '',
-          url: tweetUrl,
-          username: authorLink?.href?.split('/').pop() || '',
-          timestamp: timeEl?.getAttribute('datetime') || '',
-        };
-      }).filter(t => t.url);
-    }, limit);
+    return Array.from(collected.values()).slice(0, limit);
   }
 
   // XActionsの likePost() 互換

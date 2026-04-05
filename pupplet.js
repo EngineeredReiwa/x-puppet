@@ -1,6 +1,6 @@
 #!/usr/bin/env node
-// puppet - Multi-platform DOM automation via Chrome DevTools Protocol
-// Usage: puppet <platform> <command> [args]
+// pupplet - Multi-platform DOM automation via Chrome DevTools Protocol
+// Usage: pupplet <platform> <command> [args]
 //
 // Prerequisites:
 //   Launch Chrome with: --remote-debugging-port=9222
@@ -19,9 +19,9 @@ const platforms = {
 
 function showHelp() {
   console.log(`
-puppet - Multi-platform DOM automation via CDP
+pupplet - Multi-platform DOM automation via CDP
 
-Usage: puppet <platform> <command> [args]
+Usage: pupplet <platform> <command> [args]
 
 Platforms:`);
 
@@ -29,7 +29,7 @@ Platforms:`);
     const mod = loader();
     console.log(`\n  ${name}:`);
     for (const [cmd, info] of Object.entries(mod.commands)) {
-      console.log(`    puppet ${name} ${info.usage}`);
+      console.log(`    pupplet ${name} ${info.usage}`);
     }
   }
 
@@ -55,9 +55,9 @@ async function main() {
   const platform = platforms[platformName]();
 
   if (!command || command === '--help' || command === '-h') {
-    console.log(`\npuppet ${platformName} commands:\n`);
+    console.log(`\npupplet ${platformName} commands:\n`);
     for (const [cmd, info] of Object.entries(platform.commands)) {
-      console.log(`  puppet ${platformName} ${info.usage}`);
+      console.log(`  pupplet ${platformName} ${info.usage}`);
     }
     process.exit(0);
   }

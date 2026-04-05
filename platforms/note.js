@@ -1,4 +1,4 @@
-// puppet - note.com platform module
+// pupplet - note.com platform module
 // DOM automation for note.com via CDP
 
 const { connectToTab, evaluate, sleep } = require('../core/cdp');
@@ -282,7 +282,7 @@ function markdownToHtml(md) {
 
 async function post(client, filePath) {
   if (!filePath) {
-    console.error('❌ Usage: puppet note post <markdown-file>');
+    console.error('❌ Usage: pupplet note post <markdown-file>');
     return;
   }
 

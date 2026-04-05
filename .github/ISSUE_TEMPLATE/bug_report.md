@@ -11,7 +11,7 @@ labels: bug
 ## Command
 
 ```bash
-node puppet.js ...
+node pupplet.js ...
 ```
 
 ## Expected behavior

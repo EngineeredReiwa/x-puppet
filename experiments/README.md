@@ -1,4 +1,4 @@
-# puppet: Recipe vs Low-level DOM — Measurement Experiment
+# pupplet: Recipe vs Low-level DOM — Measurement Experiment
 
 ## 目的
 
@@ -16,7 +16,7 @@ LLM による「低レベル DOM 操作の逐次実行」と、site-specific rec
 
 | 条件 | 説明 |
 |------|------|
-| **R (recipe あり)** | `node puppet.js <platform> <cmd> [args]` で完結。LLM から見て 1 tool call |
+| **R (recipe あり)** | `node pupplet.js <platform> <cmd> [args]` で完結。LLM から見て 1 tool call |
 | **L (recipe なし)** | MCP browser tools 等で DOM を読み、セレクタを推定し、手続きを逐次組み立てる |
 
 browser backend の比較ではない。両方とも同じ Chrome + CDP を使う。変えるのは

@@ -1,23 +1,23 @@
 <p align="center">
-  <h1 align="center">puppet</h1>
+  <h1 align="center">pupplet</h1>
   <p align="center">
     Multi-platform social media automation via Chrome DevTools Protocol.<br>
     No API keys. No Puppeteer. No new browser. Just your Chrome.
   </p>
   <p align="center">
-    <a href="https://github.com/EngineeredReiwa/x-puppet/stargazers"><img src="https://img.shields.io/github/stars/EngineeredReiwa/x-puppet?style=social" alt="Stars"></a>
-    <a href="https://github.com/EngineeredReiwa/x-puppet/network/members"><img src="https://img.shields.io/github/forks/EngineeredReiwa/x-puppet?style=social" alt="Forks"></a>
-    <a href="https://github.com/EngineeredReiwa/x-puppet/blob/main/LICENSE"><img src="https://img.shields.io/badge/license-MIT-blue.svg" alt="License"></a>
-    <a href="https://github.com/EngineeredReiwa/x-puppet/issues"><img src="https://img.shields.io/github/issues/EngineeredReiwa/x-puppet" alt="Issues"></a>
-    <a href="https://github.com/EngineeredReiwa/x-puppet/pulls"><img src="https://img.shields.io/github/issues-pr/EngineeredReiwa/x-puppet" alt="PRs"></a>
+    <a href="https://github.com/EngineeredReiwa/pupplet/stargazers"><img src="https://img.shields.io/github/stars/EngineeredReiwa/pupplet?style=social" alt="Stars"></a>
+    <a href="https://github.com/EngineeredReiwa/pupplet/network/members"><img src="https://img.shields.io/github/forks/EngineeredReiwa/pupplet?style=social" alt="Forks"></a>
+    <a href="https://github.com/EngineeredReiwa/pupplet/blob/main/LICENSE"><img src="https://img.shields.io/badge/license-MIT-blue.svg" alt="License"></a>
+    <a href="https://github.com/EngineeredReiwa/pupplet/issues"><img src="https://img.shields.io/github/issues/EngineeredReiwa/pupplet" alt="Issues"></a>
+    <a href="https://github.com/EngineeredReiwa/pupplet/pulls"><img src="https://img.shields.io/github/issues-pr/EngineeredReiwa/pupplet" alt="PRs"></a>
   </p>
 </p>
 
 ---
 
-## What is puppet?
+## What is pupplet?
 
-**puppet** turns your everyday Chrome into a social media automation engine. It connects to your already-logged-in browser via CDP (Chrome DevTools Protocol) — no API keys, no tokens, no headless browser.
+**pupplet** turns your everyday Chrome into a social media automation engine. It connects to your already-logged-in browser via CDP (Chrome DevTools Protocol) — no API keys, no tokens, no headless browser.
 
 One dependency. Zero config. Works everywhere Chrome runs.
 
@@ -32,9 +32,9 @@ One dependency. Zero config. Works everywhere Chrome runs.
 
 > **Want to add a platform?** It takes ~100 lines. See [Contributing](#contributing).
 
-## Why puppet?
+## Why pupplet?
 
-| | Official API | Puppeteer | **puppet (CDP)** |
+| | Official API | Puppeteer | **pupplet (CDP)** |
 |---|---|---|---|
 | Cost | $100/mo+ | Free | **Free** |
 | Browser | N/A | New Chromium | **Your Chrome** |
@@ -50,7 +50,7 @@ One dependency. Zero config. Works everywhere Chrome runs.
 # Quit Chrome first (Cmd+Q), then:
 /Applications/Google\ Chrome.app/Contents/MacOS/Google\ Chrome \
   --remote-debugging-port=9222 \
-  --user-data-dir="$HOME/.puppet-chrome"
+  --user-data-dir="$HOME/.pupplet-chrome"
 ```
 
 > First time? Log into X / Reddit / Discord manually in this Chrome window. Sessions persist.
@@ -60,16 +60,16 @@ One dependency. Zero config. Works everywhere Chrome runs.
 **One-command install (with Claude Code skill):**
 
 ```bash
-npx github:EngineeredReiwa/x-puppet puppet-install
+npx github:EngineeredReiwa/pupplet pupplet-install
 ```
 
-This clones the repo to `~/puppet`, installs dependencies, and links the Claude Code skill automatically.
+This clones the repo to `~/pupplet`, installs dependencies, and links the Claude Code skill automatically.
 
 **Or manual install:**
 
 ```bash
-git clone https://github.com/EngineeredReiwa/x-puppet.git
-cd x-puppet
+git clone https://github.com/EngineeredReiwa/pupplet.git
+cd pupplet
 npm install
 ```
 
@@ -77,34 +77,34 @@ npm install
 
 ```bash
 # --- X / Twitter ---
-node puppet.js x timeline 5                 # Read timeline
-node puppet.js x tweet "Hello!"             # Post a tweet
-node puppet.js x like 0                     # Like a tweet
-node puppet.js x search "query" 10          # Search tweets
+node pupplet.js x timeline 5                 # Read timeline
+node pupplet.js x tweet "Hello!"             # Post a tweet
+node pupplet.js x like 0                     # Like a tweet
+node pupplet.js x search "query" 10          # Search tweets
 
 # --- Reddit ---
-node puppet.js reddit feed 20 javascript    # r/javascript posts
-node puppet.js reddit search "book" 10      # Search Reddit
-node puppet.js reddit read 0                # Post detail + comments
-node puppet.js reddit upvote 0              # Upvote
+node pupplet.js reddit feed 20 javascript    # r/javascript posts
+node pupplet.js reddit search "book" 10      # Search Reddit
+node pupplet.js reddit read 0                # Post detail + comments
+node pupplet.js reddit upvote 0              # Upvote
 
 # --- Discord ---
-node puppet.js discord discover "light novel" 10  # Search servers
-node puppet.js discord join 0                     # Join server
-node puppet.js discord channels                   # List channels
-node puppet.js discord messages 20                # Read messages
-node puppet.js discord send "Hello!"              # Send message
+node pupplet.js discord discover "light novel" 10  # Search servers
+node pupplet.js discord join 0                     # Join server
+node pupplet.js discord channels                   # List channels
+node pupplet.js discord messages 20                # Read messages
+node pupplet.js discord send "Hello!"              # Send message
 
 # --- note.com ---
-node puppet.js note feed 10                 # Read feed
-node puppet.js note search "keyword" 10     # Search articles
-node puppet.js note suki 0                  # Like article
-node puppet.js note post article.md         # Post article from markdown
+node pupplet.js note feed 10                 # Read feed
+node pupplet.js note search "keyword" 10     # Search articles
+node pupplet.js note suki 0                  # Like article
+node pupplet.js note post article.md         # Post article from markdown
 ```
 
 ## Commands
 
-### puppet x
+### pupplet x
 
 | Command | Description |
 |---------|-------------|
@@ -118,7 +118,7 @@ node puppet.js note post article.md         # Post article from markdown
 | `navigate <path>` | Go to x.com/\<path\> |
 | `eval <js>` | Execute JS on page |
 
-### puppet reddit
+### pupplet reddit
 
 | Command | Description |
 |---------|-------------|
@@ -131,7 +131,7 @@ node puppet.js note post article.md         # Post article from markdown
 | `navigate <subreddit>` | Navigate to subreddit |
 | `eval <js>` | Execute JS on page |
 
-### puppet discord
+### pupplet discord
 
 | Command | Description |
 |---------|-------------|
@@ -143,7 +143,7 @@ node puppet.js note post article.md         # Post article from markdown
 | `navigate <path>` | Navigate to Discord path |
 | `eval <js>` | Execute JS on page |
 
-### puppet note
+### pupplet note
 
 | Command | Description |
 |---------|-------------|
@@ -159,8 +159,8 @@ node puppet.js note post article.md         # Post article from markdown
 Your Chrome (with --remote-debugging-port=9222)
   ^ CDP (Chrome DevTools Protocol)
   |
-puppet (Node.js)
-  +-- puppet.js          -- Multi-platform CLI router
+pupplet (Node.js)
+  +-- pupplet.js          -- Multi-platform CLI router
   +-- core/
   |   +-- cdp.js         -- Shared: connectToTab, evaluate, sleep
   +-- platforms/
@@ -175,7 +175,7 @@ puppet (Node.js)
 ### Adding a New Platform
 
 1. Create `platforms/yoursite.js` with `connect()` and `commands` export
-2. Add it to the `platforms` object in `puppet.js`
+2. Add it to the `platforms` object in `pupplet.js`
 3. Submit a PR
 
 That's it. ~100 lines to add a whole platform.
@@ -194,11 +194,11 @@ See [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines.
 - **Better error handling** — Retry logic, DOM change detection
 - **Documentation** — Tutorials, examples, translations
 
-Check out the [good first issues](https://github.com/EngineeredReiwa/x-puppet/issues?q=is%3Aissue+is%3Aopen+label%3A%22good+first+issue%22) to get started.
+Check out the [good first issues](https://github.com/EngineeredReiwa/pupplet/issues?q=is%3Aissue+is%3Aopen+label%3A%22good+first+issue%22) to get started.
 
 ## Maintainers Wanted
 
-puppet is community-driven. If you're actively contributing and want to help maintain this project, open an issue or reach out. We're looking for platform maintainers who can own specific modules (e.g., the Reddit module, the Discord module).
+pupplet is community-driven. If you're actively contributing and want to help maintain this project, open an issue or reach out. We're looking for platform maintainers who can own specific modules (e.g., the Reddit module, the Discord module).
 
 ## Credits
 

@@ -1,9 +1,9 @@
 ---
-name: x-puppet
+name: pupplet
 description: "X/Twitter automation via CDP. Use when the user asks to post tweets, like tweets, search X, check notifications, follow/unfollow users, or automate X engagement. Requires Chrome running with --remote-debugging-port=9222."
 ---
 
-# x-puppet — X/Twitter DOM Automation
+# pupplet — X/Twitter DOM Automation
 
 Automate X (Twitter) by controlling the user's Chrome browser via CDP (Chrome DevTools Protocol).
 
@@ -14,7 +14,7 @@ Chrome must be running with `--remote-debugging-port=9222`:
 ```bash
 /Applications/Google\ Chrome.app/Contents/MacOS/Google\ Chrome \
   --remote-debugging-port=9222 \
-  --user-data-dir="$HOME/.x-puppet-chrome"
+  --user-data-dir="$HOME/.pupplet-chrome"
 ```
 
 If the user hasn't started Chrome with CDP, tell them to run the command above first.
@@ -68,7 +68,7 @@ node ${CLAUDE_SKILL_DIR}/../../../index.js <command> [args]
 
 ```bash
 # Post a tweet
-node index.js tweet "Hello from x-puppet!"
+node index.js tweet "Hello from pupplet!"
 
 # Search for tweets about a topic
 node index.js search "Kindle NotebookLM" 5

@@ -1,10 +1,10 @@
-# Contributing to puppet
+# Contributing to pupplet
 
-Thanks for your interest in contributing! puppet is a community-driven project — every PR makes the tool better for everyone.
+Thanks for your interest in contributing! pupplet is a community-driven project — every PR makes the tool better for everyone.
 
 ## Quick Overview
 
-puppet automates social media platforms by connecting to your Chrome via CDP. Each platform is a self-contained module in `platforms/`.
+pupplet automates social media platforms by connecting to your Chrome via CDP. Each platform is a self-contained module in `platforms/`.
 
 ## Adding a New Platform
 
@@ -44,7 +44,7 @@ module.exports = { connect, commands };
 
 ### 2. Register it
 
-Add one line to `puppet.js`:
+Add one line to `pupplet.js`:
 
 ```js
 const platforms = {
@@ -60,7 +60,7 @@ const platforms = {
 ```bash
 # Make sure Chrome is running with --remote-debugging-port=9222
 # and you're logged into the platform
-node puppet.js yoursite feed 5
+node pupplet.js yoursite feed 5
 ```
 
 ### 4. Submit a PR
@@ -76,7 +76,7 @@ Update the README platform table and command reference, then open a PR.
 
 ## Code Style
 
-- **Keep it simple.** puppet's strength is its simplicity. One dependency. Minimal abstraction.
+- **Keep it simple.** pupplet's strength is its simplicity. One dependency. Minimal abstraction.
 - **No new dependencies** unless absolutely necessary. Discuss in an issue first.
 - **DOM-first.** Prefer DOM scraping/manipulation over API calls. Use APIs only when DOM isn't viable (like Reddit's JSON API for pagination).
 - **Platform modules are self-contained.** Each platform file should work independently.

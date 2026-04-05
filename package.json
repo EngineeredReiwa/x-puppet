@@ -1,17 +1,16 @@
 {
-  "name": "puppet",
-  "version": "0.2.0",
-  "description": "Multi-platform DOM automation via Chrome DevTools Protocol. No API keys needed.",
-  "main": "index.js",
+  "name": "pupplet",
+  "version": "0.3.0",
+  "description": "Site-specific browser recipes for LLM agents. Multi-platform social media automation via Chrome DevTools Protocol. No API keys.",
+  "main": "pupplet.js",
   "bin": {
-    "puppet": "./puppet.js",
-    "x-puppet": "./index.js",
-    "puppet-install": "./install.js"
+    "pupplet": "./pupplet.js",
+    "pupplet-install": "./install.js"
   },
   "scripts": {
-    "start": "node index.js"
+    "start": "node pupplet.js"
   },
-  "keywords": ["twitter", "x", "reddit", "automation", "cdp", "dom", "social-media"],
+  "keywords": ["twitter", "x", "reddit", "discord", "note", "automation", "cdp", "dom", "social-media", "llm-agent", "browser-recipes"],
   "license": "MIT",
   "dependencies": {
     "chrome-remote-interface": "^0.34.0"

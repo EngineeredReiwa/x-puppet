@@ -13,7 +13,7 @@ async function main() {
 
   if (!command || command === 'help') {
     console.log(`
-x-puppet - X/Twitter automation via CDP (no API key needed)
+pupplet - X/Twitter automation via CDP (no API key needed)
 
 Usage: node index.js <command> [args]
 

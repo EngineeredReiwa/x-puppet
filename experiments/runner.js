@@ -1,10 +1,10 @@
 #!/usr/bin/env node
 // Runner for the "R (recipe あり)" condition.
-// Spawns a puppet subprocess, measures wall time and stdout bytes,
+// Spawns a pupplet subprocess, measures wall time and stdout bytes,
 // writes a JSON result to experiments/results/.
 //
 // Usage:
-//   node experiments/runner.js <task-id> <trial-num> -- <puppet-args...>
+//   node experiments/runner.js <task-id> <trial-num> -- <pupplet-args...>
 //
 // Example:
 //   node experiments/runner.js reddit-feed 1 -- reddit feed 10 javascript
@@ -17,13 +17,13 @@ const path = require('path');
 const args = process.argv.slice(2);
 const sepIdx = args.indexOf('--');
 if (sepIdx < 0) {
-  console.error('Usage: node runner.js <task-id> <trial-num> -- <puppet-args...>');
+  console.error('Usage: node runner.js <task-id> <trial-num> -- <pupplet-args...>');
   process.exit(1);
 }
 
 const taskId = args[0];
 const trialNum = parseInt(args[1]);
-const puppetArgs = args.slice(sepIdx + 1);
+const puppletArgs = args.slice(sepIdx + 1);
 
 const startTime = Date.now();
 const startIso = new Date().toISOString();
@@ -33,8 +33,8 @@ let stderrBytes = 0;
 let stdoutBuffer = '';
 let stderrBuffer = '';
 
-const puppetBin = path.join(__dirname, '..', 'puppet.js');
-const proc = spawn('node', [puppetBin, ...puppetArgs], {
+const puppletBin = path.join(__dirname, '..', 'pupplet.js');
+const proc = spawn('node', [puppletBin, ...puppletArgs], {
   cwd: path.join(__dirname, '..'),
 });
 
@@ -47,7 +47,7 @@ proc.stderr.on('data', (chunk) => {
   stderrBuffer += chunk.toString();
 });
 
-// Some puppet commands (e.g., note post) succeed but then hang on client.close().
+// Some pupplet commands (e.g., note post) succeed but then hang on client.close().
 // Detect success from stdout and force-exit if we see the success marker.
 const SUCCESS_MARKERS = [/✅/, /Draft created/, /^📝 \d+ articles/m, /\[\d+\]/];
 let successDetected = false;
@@ -98,7 +98,7 @@ proc.on('close', (exitCode) => {
     success,
     failure_reason: failureReason,
     exit_code: exitCode,
-    command: ['node', 'puppet.js', ...puppetArgs].join(' '),
+    command: ['node', 'pupplet.js', ...puppletArgs].join(' '),
     stdout_preview: stdoutBuffer.slice(0, 500),
     stderr_preview: stderrBuffer.slice(0, 500),
   };

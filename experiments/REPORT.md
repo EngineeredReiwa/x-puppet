@@ -2,13 +2,13 @@
 
 **実験日**: 2026-04-05
 **著者**: EngineeredReiwa
-**ツール**: [puppet](https://github.com/EngineeredReiwa/x-puppet)
+**ツール**: [pupplet](https://github.com/EngineeredReiwa/pupplet)
 
 ---
 
 ## A. もともとの構想
 
-もともとの puppet の構想は、"Chrome DevTools Protocol (CDP) を使った便利なブラウザ自動化ツール" という位置づけだった。API キーや新しい Chromium プロセスを立ち上げず、ユーザーが普段使っている Chrome に直接接続して、DOM 操作を行うという点が売りだった。
+もともとの pupplet の構想は、"Chrome DevTools Protocol (CDP) を使った便利なブラウザ自動化ツール" という位置づけだった。API キーや新しい Chromium プロセスを立ち上げず、ユーザーが普段使っている Chrome に直接接続して、DOM 操作を行うという点が売りだった。
 
 主な比較対象は Puppeteer や Playwright、あるいは公式 API を使った自動化だった。
 
@@ -30,7 +30,7 @@
 
 そこで構想は次のように変わった：
 
-> puppet は「汎用ブラウザ自動化フレームワーク」ではなく、
+> pupplet は「汎用ブラウザ自動化フレームワーク」ではなく、
 > **サイト別の脆くて寿命の短いアクションレシピを、LLM が呼び出せる形に圧縮して共有する仕組み**。
 
 この発想では、LLM は高レベルの意図（「r/javascript の最新10件を読む」「note.com に下書きを作る」）だけを扱い、実際の DOM 操作詳細は recipe 関数の中に閉じ込める。
@@ -50,7 +50,7 @@
 
 | 条件 | 説明 | LLM の役割 |
 |------|------|-----------|
-| **R (recipe あり)** | `node puppet.js <platform> <cmd>` を 1 回実行 | 1 tool call で完結 |
+| **R (recipe あり)** | `node pupplet.js <platform> <cmd>` を 1 回実行 | 1 tool call で完結 |
 | **L (recipe なし)** | CDP Runtime.evaluate 経由で DOM を段階的に探索・操作 | 複数 tool call を逐次発行 |
 
 **browser backend は同一** (Chrome + CDP)。変えているのは「LLM がループする粒度」だけ。
@@ -145,7 +145,7 @@ R 条件では、LLM のコンテキストに流れ込むのは recipe の出力
 
 - reddit-feed: R は 19.3 倍速い。L は 4 回のスクロール失敗を経て JSON API への切り替えに至る。
 - note-draft: L の方が速いという意外な結果が出たが、これは 2 つの要因による：
-  1. R 条件の `puppet note post` は ProseMirror のロード待ち・navigate 待ちのために固定の sleep を含んでおり、14秒近くを待機時間が占める
+  1. R 条件の `pupplet note post` は ProseMirror のロード待ち・navigate 待ちのために固定の sleep を含んでおり、14秒近くを待機時間が占める
   2. L 条件の「成功」は DOM レベル verify だけでしか確認しておらず、後述のとおり実際には React/ProseMirror 内部状態に反映されていない可能性が高い（= 未完の状態で "完了" と判定された）
 
 成功率は両条件とも 3/3 だが、これは L の note-draft については疑義つきである（F.3 参照）。
@@ -189,7 +189,7 @@ reddit-feed は読み取り系タスク、note-draft は書き込み系タスク
 
 note-draft で L が R より速かった理由を正確に把握しておきたい。
 
-- **R の 11.9秒**: `puppet note post` 内で (a) 新規タブ作成 → editor.note.com リダイレクト待ち (5s sleep)、(b) ProseMirror ロード待ち (2s sleep)、(c) Page domain enable + Runtime enable + 複数 sleep (合計数秒) を含む。これらは recipe 側が「確実に動くため」に敢えて取っている安全マージン。
+- **R の 11.9秒**: `pupplet note post` 内で (a) 新規タブ作成 → editor.note.com リダイレクト待ち (5s sleep)、(b) ProseMirror ロード待ち (2s sleep)、(c) Page domain enable + Runtime enable + 複数 sleep (合計数秒) を含む。これらは recipe 側が「確実に動くため」に敢えて取っている安全マージン。
 - **L の 8.1秒**: L も同じ 5s sleep を取っているが、その後の verify は即座で終わる（= 誤った成功判定のため「追加待ち」が発生しない）。
 
 つまり、L は「待つべきところを待っていないので速いが、実は保存できない」という状態。**time では L が勝っているが、actually-works では R が勝っている**。

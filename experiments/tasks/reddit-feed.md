@@ -11,7 +11,7 @@ stdout に少なくとも 10 件の投稿情報（タイトル＋URL）が含ま
 ## R condition command
 
 ```
-node puppet.js reddit feed 10 javascript
+node pupplet.js reddit feed 10 javascript
 ```
 
 ## L condition procedure (LLM が逐次実行する想定)

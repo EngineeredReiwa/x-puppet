@@ -1,0 +1,17 @@
+{
+  "condition": "R",
+  "task_id": "note-draft",
+  "trial": 3,
+  "started_at": "2026-04-05T02:39:26.188Z",
+  "wall_time_ms": 11895,
+  "tool_calls": 1,
+  "bytes_in_context": 161,
+  "dom_inspections": 0,
+  "retries": 0,
+  "success": true,
+  "failure_reason": null,
+  "exit_code": null,
+  "command": "node puppet.js note post experiments/tasks/sample.md",
+  "stdout_preview": "📝 Title: テスト投稿\n📝 Body: 123 chars of HTML\n✅ Draft created! (83 chars in body)\n   → Review in browser, then click \"公開に進む\" to publish\n",
+  "stderr_preview": ""
+}

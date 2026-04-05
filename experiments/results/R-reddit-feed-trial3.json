@@ -1,0 +1,17 @@
+{
+  "condition": "R",
+  "task_id": "reddit-feed",
+  "trial": 3,
+  "started_at": "2026-04-05T02:36:00.137Z",
+  "wall_time_ms": 751,
+  "tool_calls": 1,
+  "bytes_in_context": 1333,
+  "dom_inspections": 0,
+  "retries": 0,
+  "success": true,
+  "failure_reason": null,
+  "exit_code": 0,
+  "command": "node puppet.js reddit feed 10 javascript",
+  "stdout_preview": "📜 10 posts:\n  [0] ⬆6 💬8 r/javascript\n       Showoff Saturday (April 04, 2026)\n       by AutoModerator | text\n  [1] ⬆2 💬1 r/javascript\n       Your /r/javascript recap for the week of March 23 - March 29, 2026\n       by subredditsummarybot | text\n  [2] ⬆194 💬27 r/javascript\n       The Axios supply chain attack used individually targeted social engineering - \"t\n       by magenta_placenta | link\n  [3] ⬆0 💬0 r/javascript\n       I built an open source npm supply chain monitor with eBPF kernel mon",
+  "stderr_preview": ""
+}

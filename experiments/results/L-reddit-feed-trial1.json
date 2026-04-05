@@ -1,0 +1,14 @@
+{
+  "condition": "L",
+  "task_id": "reddit-feed",
+  "trial": 1,
+  "success": true,
+  "failure_reason": null,
+  "wall_time_ms": 14064,
+  "tool_calls": 18,
+  "bytes_in_context": 10882,
+  "dom_inspections": 10,
+  "retries": 0,
+  "result_count": 10,
+  "hint_level_used": 1
+}

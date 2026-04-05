@@ -1,0 +1,13 @@
+{
+  "condition": "L",
+  "task_id": "note-draft",
+  "trial": 2,
+  "success": true,
+  "failure_reason": null,
+  "wall_time_ms": 8133,
+  "tool_calls": 17,
+  "bytes_in_context": 1080,
+  "dom_inspections": 3,
+  "retries": 0,
+  "hint_level_used": 1
+}

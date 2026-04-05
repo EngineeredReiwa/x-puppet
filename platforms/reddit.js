@@ -1,4 +1,6 @@
 const { connectToTab, evaluate, sleep } = require('../core/cdp');
+const fs = require('fs');
+const path = require('path');
 
 async function connect() {
   return connectToTab('reddit.com');
@@ -262,12 +264,21 @@ async function comment(client, permalink, text) {
   const { Page, Input, Target } = client;
   await Page.enable();
 
-  // Activate this tab to ensure Input API works
+  // Activate tab in Chrome
   try {
     const { targetInfo } = await Target.getTargetInfo();
     await Target.activateTarget({ targetId: targetInfo.targetId });
-  } catch (e) { /* older CDP versions may not support this */ }
-  await sleep(500);
+  } catch (e) {}
+  try {
+    await Page.bringToFront();
+  } catch (e) {}
+
+  // Bring Chrome app to foreground on macOS
+  try {
+    const { execSync } = require('child_process');
+    execSync(`osascript -e 'tell application "Google Chrome" to activate'`, { stdio: 'ignore' });
+  } catch (e) {}
+  await sleep(800);
 
   const url = permalink.startsWith('http')
     ? permalink
@@ -306,16 +317,55 @@ async function comment(client, permalink, text) {
     console.error('❌ comment box not found on', url);
     return;
   }
-  const { x, y } = JSON.parse(pos);
 
-  // Click faceplate to expand editor
-  await Input.dispatchMouseEvent({ type: 'mousePressed', x, y, button: 'left', clickCount: 1, pointerType: 'mouse' });
-  await Input.dispatchMouseEvent({ type: 'mouseReleased', x, y, button: 'left', clickCount: 1, pointerType: 'mouse' });
-  await sleep(2000);
-
-  // Wait for expanded editor — also use querySelectorAll via parent
+  // Click faceplate and retry until editor expands (up to 5 attempts)
   let editorPos = '';
-  for (let i = 0; i < 5; i++) {
+  for (let attempt = 0; attempt < 5; attempt++) {
+    // Re-query faceplate position each attempt
+    const currentPos = await evaluate(client, `
+      (function() {
+        var cch = document.querySelector('comment-composer-host');
+        if (!cch) return '';
+        var els = cch.querySelectorAll('*');
+        for (var j = 0; j < els.length; j++) {
+          if (els[j].tagName === 'FACEPLATE-TEXTAREA-INPUT') {
+            els[j].scrollIntoView({ block: 'center' });
+            var rect = els[j].getBoundingClientRect();
+            if (rect.width > 100) {
+              return JSON.stringify({ x: rect.x + rect.width / 2, y: rect.y + rect.height / 2 });
+            }
+          }
+        }
+        return '';
+      })()
+    `);
+    if (!currentPos) {
+      // Editor already expanded? Check
+      const expanded = await evaluate(client, `
+        (function() {
+          var cch = document.querySelector('comment-composer-host');
+          if (!cch) return '';
+          var els = cch.querySelectorAll('*');
+          for (var j = 0; j < els.length; j++) {
+            if (els[j].getAttribute('role') === 'textbox' && els[j].contentEditable === 'true') {
+              var rect = els[j].getBoundingClientRect();
+              if (rect.width > 100) {
+                return JSON.stringify({ x: rect.x + rect.width / 2, y: rect.y + rect.height / 2 });
+              }
+            }
+          }
+          return '';
+        })()
+      `);
+      if (expanded) { editorPos = expanded; break; }
+      await sleep(2000);
+      continue;
+    }
+    const cp = JSON.parse(currentPos);
+    await Input.dispatchMouseEvent({ type: 'mousePressed', x: cp.x, y: cp.y, button: 'left', clickCount: 1, pointerType: 'mouse' });
+    await Input.dispatchMouseEvent({ type: 'mouseReleased', x: cp.x, y: cp.y, button: 'left', clickCount: 1, pointerType: 'mouse' });
+    await sleep(2000);
+
     editorPos = await evaluate(client, `
       (function() {
         var cch = document.querySelector('comment-composer-host');
@@ -333,7 +383,7 @@ async function comment(client, permalink, text) {
       })()
     `);
     if (editorPos) break;
-    await sleep(1000);
+    console.log(`  (retry ${attempt + 1}/5: editor not yet expanded)`);
   }
 
   if (!editorPos) {
@@ -484,6 +534,133 @@ async function eval_(client, js) {
   console.log(result);
 }
 
+// --- Submit (new top-level post) ---
+//
+// Parses a markdown file where the first `# ` line is the title and the rest is the body.
+// Navigates to old.reddit.com/r/<subreddit>/submit (simpler than the React-based new UI),
+// fills the form, and leaves it for manual review. Does NOT auto-click submit — Reddit
+// submission is a one-way action and often requires captcha.
+
+function parseMarkdownPost(filePath) {
+  const resolved = path.resolve(filePath);
+  const content = fs.readFileSync(resolved, 'utf-8');
+  const lines = content.split('\n');
+  let title = '';
+  const bodyLines = [];
+  let titleFound = false;
+  for (const line of lines) {
+    if (!titleFound && line.startsWith('# ')) {
+      title = line.slice(2).trim();
+      titleFound = true;
+    } else {
+      bodyLines.push(line);
+    }
+  }
+  while (bodyLines.length > 0 && bodyLines[0].trim() === '') bodyLines.shift();
+  return { title, body: bodyLines.join('\n') };
+}
+
+async function submit(client, subreddit, filePath) {
+  if (!subreddit || !filePath) {
+    console.error('❌ Usage: pupplet reddit submit <subreddit> <markdown-file>');
+    return;
+  }
+  if (!fs.existsSync(path.resolve(filePath))) {
+    console.error(`❌ File not found: ${filePath}`);
+    return;
+  }
+
+  const { title, body } = parseMarkdownPost(filePath);
+  if (!title) {
+    console.error('❌ First line of the markdown file must be "# <title>"');
+    return;
+  }
+
+  console.log(`📝 Subreddit: r/${subreddit}`);
+  console.log(`📝 Title: ${title}`);
+  console.log(`📝 Body: ${body.length} chars`);
+
+  // Create a new tab for the submit page (avoids stale CDP connections,
+  // same pattern as note.post)
+  const CDP = require('chrome-remote-interface');
+  const port = parseInt(process.env.CDP_PORT || '9222');
+  const submitUrl = `https://old.reddit.com/r/${subreddit}/submit?selftext=true`;
+
+  const tmpClient = await CDP({ port });
+  await tmpClient.Target.createTarget({ url: submitUrl });
+  await tmpClient.close();
+  await sleep(4000);
+
+  // Connect to the new submit tab
+  const targets = await CDP.List({ port });
+  const submitTab = targets.find(
+    (t) => t.type === 'page' && t.url.includes('old.reddit.com') && t.url.includes('/submit'),
+  );
+  if (!submitTab) {
+    console.error('❌ Submit tab not found. Are you logged in to old.reddit.com?');
+    return;
+  }
+
+  const submitClient = await CDP({ port, target: submitTab });
+  await submitClient.Runtime.enable();
+  await sleep(1500);
+
+  // Verify we're on the submit page (not redirected to login)
+  const url = await evaluate(submitClient, `window.location.href`);
+  if (url.includes('/login')) {
+    console.error('❌ Redirected to login. Log into old.reddit.com first, then retry.');
+    await submitClient.close();
+    return;
+  }
+  console.log(`🔗 On: ${url}`);
+
+  // Fill title
+  const titleFilled = await evaluate(
+    submitClient,
+    `(() => {
+      const t = document.querySelector('textarea[name="title"]') || document.querySelector('input[name="title"]');
+      if (!t) return 'NO_TITLE_FIELD';
+      t.focus();
+      t.value = ${JSON.stringify(title)};
+      t.dispatchEvent(new Event('input', { bubbles: true }));
+      t.dispatchEvent(new Event('change', { bubbles: true }));
+      return t.value;
+    })()`,
+  );
+  if (titleFilled === 'NO_TITLE_FIELD') {
+    console.error('❌ Title field not found. old.reddit.com layout may have changed.');
+    await submitClient.close();
+    return;
+  }
+  console.log(`✏️  Title filled: ${titleFilled.slice(0, 60)}`);
+
+  // Fill body
+  const bodyFilled = await evaluate(
+    submitClient,
+    `(() => {
+      const t = document.querySelector('textarea[name="text"]');
+      if (!t) return 'NO_BODY_FIELD';
+      t.focus();
+      t.value = ${JSON.stringify(body)};
+      t.dispatchEvent(new Event('input', { bubbles: true }));
+      t.dispatchEvent(new Event('change', { bubbles: true }));
+      return t.value.length;
+    })()`,
+  );
+  if (bodyFilled === 'NO_BODY_FIELD') {
+    console.error('❌ Body field not found. old.reddit.com layout may have changed.');
+    await submitClient.close();
+    return;
+  }
+  console.log(`✏️  Body filled: ${bodyFilled} chars`);
+
+  console.log(`\n✅ Form filled on old.reddit.com/r/${subreddit}/submit`);
+  console.log(`   → Review in browser, solve captcha if needed, then click "submit"`);
+
+  // Force exit after a short grace period (CDP close can hang)
+  setTimeout(() => process.exit(0), 500);
+}
+
 const commands = {
   feed:     { fn: (c, args) => feed(c, parseInt(args[0]) || 5, args[1] || null),  usage: 'feed [limit] [subreddit]' },
   search:   { fn: (c, args) => search(c, args[0], parseInt(args[1]) || 10),       usage: 'search <query> [limit]' },
@@ -495,6 +672,7 @@ const commands = {
   draft:    { fn: (c, args) => draft(c),                                           usage: 'draft' },
   verify:   { fn: (c, args) => verify(c),                                          usage: 'verify' },
   clear:    { fn: (c, args) => clear(c),                                           usage: 'clear' },
+  submit:   { fn: (c, args) => submit(c, args[0], args[1]),                         usage: 'submit <subreddit> <markdown-file>' },
   navigate: { fn: (c, args) => navigate_(c, args.join(' ')),                       usage: 'navigate <subreddit>' },
   eval:     { fn: (c, args) => eval_(c, args.join(' ')),                           usage: 'eval <js>' },
 };
